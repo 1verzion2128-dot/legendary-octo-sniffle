@@ -1,0 +1,645 @@
+<!DOCTYPE html>
+<html lang="uk">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>GearZone — геймерський магазин</title>
+<script src="https://telegram.org/js/telegram-web-app.js"></script>
+<style>
+  :root {
+    --bg: #0d0d0f;
+    --surface: #141418;
+    --card: #1a1a20;
+    --border: #2a2a35;
+    --accent: #7c5cfc;
+    --accent-glow: rgba(124,92,252,0.18);
+    --green: #22c55e;
+    --red: #ef4444;
+    --text: #f0eeff;
+    --muted: #7a7990;
+    --tag-bg: #1e1b33;
+  }
+  * { box-sizing: border-box; margin: 0; padding: 0; }
+  body {
+    background: var(--bg);
+    color: var(--text);
+    font-family: -apple-system, 'Segoe UI', sans-serif;
+    font-size: 15px;
+    min-height: 100vh;
+    padding-bottom: 100px;
+  }
+
+  /* Header */
+  .header {
+    background: var(--surface);
+    border-bottom: 1px solid var(--border);
+    padding: 14px 16px;
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    position: sticky;
+    top: 0;
+    z-index: 10;
+  }
+  .logo {
+    font-size: 19px;
+    font-weight: 700;
+    letter-spacing: -0.5px;
+    color: var(--text);
+  }
+  .logo span { color: var(--accent); }
+  .cart-btn {
+    background: var(--tag-bg);
+    border: 1px solid var(--border);
+    border-radius: 10px;
+    padding: 7px 13px;
+    color: var(--text);
+    font-size: 14px;
+    font-weight: 600;
+    cursor: pointer;
+    display: flex;
+    align-items: center;
+    gap: 6px;
+    transition: background 0.15s;
+  }
+  .cart-btn:active { background: var(--border); }
+  .cart-count {
+    background: var(--accent);
+    color: #fff;
+    border-radius: 50%;
+    width: 20px;
+    height: 20px;
+    font-size: 11px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-weight: 700;
+  }
+
+  /* Categories */
+  .cats {
+    display: flex;
+    gap: 8px;
+    padding: 14px 16px;
+    overflow-x: auto;
+    scrollbar-width: none;
+  }
+  .cats::-webkit-scrollbar { display: none; }
+  .cat-btn {
+    background: var(--card);
+    border: 1px solid var(--border);
+    border-radius: 20px;
+    padding: 6px 14px;
+    color: var(--muted);
+    font-size: 13px;
+    font-weight: 500;
+    white-space: nowrap;
+    cursor: pointer;
+    transition: all 0.15s;
+  }
+  .cat-btn.active {
+    background: var(--accent-glow);
+    border-color: var(--accent);
+    color: var(--text);
+  }
+
+  /* Section title */
+  .section-title {
+    font-size: 13px;
+    font-weight: 600;
+    color: var(--muted);
+    letter-spacing: 0.08em;
+    text-transform: uppercase;
+    padding: 4px 16px 10px;
+  }
+
+  /* Product grid */
+  .products {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 10px;
+    padding: 0 12px;
+  }
+
+  .product-card {
+    background: var(--card);
+    border: 1px solid var(--border);
+    border-radius: 14px;
+    padding: 14px 12px 12px;
+    display: flex;
+    flex-direction: column;
+    gap: 8px;
+    transition: border-color 0.15s;
+    position: relative;
+    overflow: hidden;
+  }
+  .product-card.in-cart {
+    border-color: var(--accent);
+  }
+  .product-icon {
+    font-size: 34px;
+    line-height: 1;
+  }
+  .product-name {
+    font-size: 13px;
+    font-weight: 600;
+    color: var(--text);
+    line-height: 1.3;
+  }
+  .product-sub {
+    font-size: 11px;
+    color: var(--muted);
+    margin-top: -4px;
+  }
+  .stock-badge {
+    display: inline-flex;
+    align-items: center;
+    gap: 4px;
+    font-size: 11px;
+    font-weight: 500;
+    border-radius: 6px;
+    padding: 2px 7px;
+  }
+  .stock-badge.in { background: rgba(34,197,94,0.12); color: var(--green); }
+  .stock-badge.out { background: rgba(239,68,68,0.12); color: var(--red); }
+  .stock-dot { width: 5px; height: 5px; border-radius: 50%; background: currentColor; }
+
+  .product-bottom {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    margin-top: 2px;
+  }
+  .price {
+    font-size: 15px;
+    font-weight: 700;
+    color: var(--text);
+  }
+  .price-sub { font-size: 10px; color: var(--muted); font-weight: 400; }
+
+  .add-btn {
+    width: 32px;
+    height: 32px;
+    border-radius: 9px;
+    border: none;
+    background: var(--accent);
+    color: #fff;
+    font-size: 20px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    cursor: pointer;
+    transition: opacity 0.15s, transform 0.1s;
+    flex-shrink: 0;
+  }
+  .add-btn:active { transform: scale(0.92); opacity: 0.8; }
+  .add-btn:disabled { background: var(--border); color: var(--muted); cursor: not-allowed; }
+
+  .qty-control {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+  }
+  .qty-btn {
+    width: 28px;
+    height: 28px;
+    border-radius: 8px;
+    border: 1px solid var(--border);
+    background: var(--surface);
+    color: var(--text);
+    font-size: 16px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    cursor: pointer;
+  }
+  .qty-num {
+    font-size: 14px;
+    font-weight: 700;
+    min-width: 18px;
+    text-align: center;
+  }
+
+  /* Cart drawer */
+  .cart-overlay {
+    position: fixed;
+    inset: 0;
+    background: rgba(0,0,0,0.65);
+    z-index: 20;
+    opacity: 0;
+    pointer-events: none;
+    transition: opacity 0.25s;
+  }
+  .cart-overlay.open { opacity: 1; pointer-events: all; }
+  .cart-drawer {
+    position: fixed;
+    bottom: 0;
+    left: 0;
+    right: 0;
+    background: var(--surface);
+    border-top: 1px solid var(--border);
+    border-radius: 20px 20px 0 0;
+    padding: 20px 16px 32px;
+    z-index: 21;
+    transform: translateY(100%);
+    transition: transform 0.3s cubic-bezier(0.4,0,0.2,1);
+    max-height: 80vh;
+    overflow-y: auto;
+  }
+  .cart-drawer.open { transform: translateY(0); }
+  .cart-handle {
+    width: 36px;
+    height: 4px;
+    background: var(--border);
+    border-radius: 2px;
+    margin: 0 auto 18px;
+  }
+  .cart-title {
+    font-size: 17px;
+    font-weight: 700;
+    margin-bottom: 16px;
+  }
+  .cart-empty {
+    color: var(--muted);
+    font-size: 14px;
+    text-align: center;
+    padding: 20px 0;
+  }
+  .cart-item {
+    display: flex;
+    align-items: center;
+    gap: 12px;
+    padding: 10px 0;
+    border-bottom: 1px solid var(--border);
+  }
+  .cart-item-icon { font-size: 26px; }
+  .cart-item-info { flex: 1; }
+  .cart-item-name { font-size: 13px; font-weight: 600; }
+  .cart-item-price { font-size: 12px; color: var(--muted); margin-top: 2px; }
+  .cart-item-remove {
+    background: none;
+    border: none;
+    color: var(--muted);
+    font-size: 18px;
+    cursor: pointer;
+    padding: 4px;
+  }
+  .cart-total {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    padding: 14px 0 16px;
+    font-size: 16px;
+    font-weight: 700;
+  }
+  .cart-total-price { color: var(--accent); }
+  .order-btn {
+    width: 100%;
+    background: var(--accent);
+    color: #fff;
+    border: none;
+    border-radius: 14px;
+    padding: 15px;
+    font-size: 16px;
+    font-weight: 700;
+    cursor: pointer;
+    transition: opacity 0.15s, transform 0.1s;
+    letter-spacing: 0.01em;
+  }
+  .order-btn:active { transform: scale(0.98); opacity: 0.9; }
+  .order-btn:disabled { background: var(--border); color: var(--muted); cursor: not-allowed; }
+
+  /* Bottom cart bar */
+  .bottom-bar {
+    position: fixed;
+    bottom: 0;
+    left: 0;
+    right: 0;
+    background: var(--surface);
+    border-top: 1px solid var(--border);
+    padding: 12px 16px;
+    z-index: 9;
+    display: none;
+  }
+  .bottom-bar.visible { display: block; }
+  .bottom-bar-btn {
+    width: 100%;
+    background: var(--accent);
+    color: #fff;
+    border: none;
+    border-radius: 14px;
+    padding: 14px;
+    font-size: 15px;
+    font-weight: 700;
+    cursor: pointer;
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+  }
+  .bottom-bar-right { display: flex; align-items: center; gap: 8px; }
+  .bottom-bar-badge {
+    background: rgba(255,255,255,0.25);
+    border-radius: 8px;
+    padding: 2px 8px;
+    font-size: 12px;
+  }
+
+  /* Success screen */
+  .success-screen {
+    display: none;
+    position: fixed;
+    inset: 0;
+    background: var(--bg);
+    z-index: 30;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    gap: 16px;
+    padding: 32px;
+    text-align: center;
+  }
+  .success-screen.visible { display: flex; }
+  .success-icon { font-size: 64px; }
+  .success-title { font-size: 22px; font-weight: 700; }
+  .success-sub { font-size: 14px; color: var(--muted); line-height: 1.5; }
+  .success-btn {
+    margin-top: 8px;
+    background: var(--accent);
+    color: #fff;
+    border: none;
+    border-radius: 12px;
+    padding: 13px 28px;
+    font-size: 15px;
+    font-weight: 700;
+    cursor: pointer;
+  }
+
+  @media (max-width: 380px) {
+    .products { grid-template-columns: 1fr 1fr; gap: 8px; }
+    .product-name { font-size: 12px; }
+    .price { font-size: 14px; }
+  }
+</style>
+</head>
+<body>
+
+<!-- Header -->
+<div class="header">
+  <div class="logo">Gear<span>Zone</span></div>
+  <button class="cart-btn" onclick="openCart()">
+    🛒 Кошик
+    <div class="cart-count" id="cart-count">0</div>
+  </button>
+</div>
+
+<!-- Categories -->
+<div class="cats">
+  <button class="cat-btn active" onclick="filterCat('all', this)">Усі</button>
+  <button class="cat-btn" onclick="filterCat('mouse', this)">🖱 Мишки</button>
+  <button class="cat-btn" onclick="filterCat('keyboard', this)">⌨️ Клавіатури</button>
+  <button class="cat-btn" onclick="filterCat('headset', this)">🎧 Навушники</button>
+  <button class="cat-btn" onclick="filterCat('pad', this)">🟫 Килимки</button>
+</div>
+
+<div class="section-title" id="section-label">Всі товари</div>
+
+<!-- Products -->
+<div class="products" id="products-grid"></div>
+
+<!-- Bottom bar -->
+<div class="bottom-bar" id="bottom-bar">
+  <button class="bottom-bar-btn" onclick="openCart()">
+    <span>Переглянути кошик</span>
+    <div class="bottom-bar-right">
+      <span id="bottom-total">0 ₴</span>
+      <span class="bottom-bar-badge" id="bottom-count">0</span>
+    </div>
+  </button>
+</div>
+
+<!-- Cart overlay -->
+<div class="cart-overlay" id="cart-overlay" onclick="closeCart()"></div>
+
+<!-- Cart drawer -->
+<div class="cart-drawer" id="cart-drawer">
+  <div class="cart-handle"></div>
+  <div class="cart-title">🛒 Кошик</div>
+  <div id="cart-items"></div>
+  <div id="cart-footer" style="display:none">
+    <div class="cart-total">
+      <span>Разом:</span>
+      <span class="cart-total-price" id="cart-total-price">0 ₴</span>
+    </div>
+    <button class="order-btn" id="order-btn" onclick="submitOrder()">Оформити замовлення</button>
+  </div>
+</div>
+
+<!-- Success screen -->
+<div class="success-screen" id="success-screen">
+  <div class="success-icon">✅</div>
+  <div class="success-title">Замовлення прийнято!</div>
+  <div class="success-sub">Ми зв'яжемося з тобою найближчим часом.<br>Дякуємо за покупку в GearZone 🎮</div>
+  <button class="success-btn" onclick="resetShop()">Повернутись до магазину</button>
+</div>
+
+<script>
+// Telegram WebApp init
+const tg = window.Telegram?.WebApp;
+if (tg) {
+  tg.ready();
+  tg.expand();
+}
+
+// --- Товари ---
+const PRODUCTS = [
+  { id:1, cat:'mouse', icon:'🖱️', name:'Logitech G502 X', sub:'Провідна, 25600 dpi', price:2190, stock:5 },
+  { id:2, cat:'mouse', icon:'🖱️', name:'Razer DeathAdder V3', sub:'Ергономічна, 30000 dpi', price:2890, stock:2 },
+  { id:3, cat:'mouse', icon:'🖱️', name:'SteelSeries Rival 650', sub:'Бездротова, RGB', price:3490, stock:0 },
+  { id:4, cat:'keyboard', icon:'⌨️', name:'HyperX Alloy FPS', sub:'Cherry MX Red, RGB', price:2650, stock:3 },
+  { id:5, cat:'keyboard', icon:'⌨️', name:'Logitech G915 TKL', sub:'Бездротова, GL Linear', price:6200, stock:1 },
+  { id:6, cat:'keyboard', icon:'⌨️', name:'Razer BlackWidow V4', sub:'Механічна, Green Switch', price:3800, stock:4 },
+  { id:7, cat:'headset', icon:'🎧', name:'SteelSeries Arctis 7P', sub:'Бездротові, 7.1 surround', price:4100, stock:2 },
+  { id:8, cat:'headset', icon:'🎧', name:'HyperX Cloud Alpha', sub:'Провідні, дводіафрагмені', price:2300, stock:6 },
+  { id:9, cat:'headset', icon:'🎧', name:'Razer BlackShark V2', sub:'Провідні, THX Spatial', price:2950, stock:0 },
+  { id:10, cat:'pad', icon:'🟫', name:'SteelSeries QcK XXL', sub:'900×400 мм, тканинна', price:890, stock:8 },
+  { id:11, cat:'pad', icon:'🟫', name:'Razer Gigantus V2 XL', sub:'940×410 мм, мікротекстура', price:1050, stock:3 },
+  { id:12, cat:'pad', icon:'🟫', name:'Logitech G840', sub:'900×400 мм, тверда', price:1350, stock:0 },
+];
+
+const CAT_NAMES = { all:'Всі товари', mouse:'🖱 Мишки', keyboard:'⌨️ Клавіатури', headset:'🎧 Навушники', pad:'🟫 Килимки' };
+
+let cart = {};     // { productId: quantity }
+let currentCat = 'all';
+
+function filterCat(cat, el) {
+  currentCat = cat;
+  document.querySelectorAll('.cat-btn').forEach(b => b.classList.remove('active'));
+  el.classList.add('active');
+  document.getElementById('section-label').textContent = CAT_NAMES[cat];
+  renderProducts();
+}
+
+function renderProducts() {
+  const list = currentCat === 'all' ? PRODUCTS : PRODUCTS.filter(p => p.cat === currentCat);
+  const grid = document.getElementById('products-grid');
+  grid.innerHTML = list.map(p => {
+    const qty = cart[p.id] || 0;
+    const inCart = qty > 0;
+    const hasStock = p.stock > 0;
+    return `
+    <div class="product-card${inCart ? ' in-cart' : ''}" id="card-${p.id}">
+      <div class="product-icon">${p.icon}</div>
+      <div class="product-name">${p.name}</div>
+      <div class="product-sub">${p.sub}</div>
+      <div class="stock-badge ${hasStock ? 'in' : 'out'}">
+        <div class="stock-dot"></div>
+        ${hasStock ? `є · ${p.stock} шт` : 'немає'}
+      </div>
+      <div class="product-bottom">
+        <div>
+          <div class="price">${p.price.toLocaleString('uk-UA')} ₴</div>
+        </div>
+        ${!hasStock
+          ? `<button class="add-btn" disabled>+</button>`
+          : inCart
+          ? `<div class="qty-control">
+               <button class="qty-btn" onclick="changeQty(${p.id},-1)">−</button>
+               <span class="qty-num">${qty}</span>
+               <button class="qty-btn" onclick="changeQty(${p.id},1)">+</button>
+             </div>`
+          : `<button class="add-btn" onclick="addToCart(${p.id})">+</button>`
+        }
+      </div>
+    </div>`;
+  }).join('');
+}
+
+function addToCart(id) {
+  cart[id] = 1;
+  updateUI();
+}
+
+function changeQty(id, delta) {
+  cart[id] = (cart[id] || 0) + delta;
+  if (cart[id] <= 0) delete cart[id];
+  updateUI();
+}
+
+function updateUI() {
+  renderProducts();
+  renderCart();
+  const total = getTotal();
+  const count = getCount();
+  document.getElementById('cart-count').textContent = count;
+  const bar = document.getElementById('bottom-bar');
+  if (count > 0) {
+    bar.classList.add('visible');
+    document.getElementById('bottom-total').textContent = total.toLocaleString('uk-UA') + ' ₴';
+    document.getElementById('bottom-count').textContent = count;
+  } else {
+    bar.classList.remove('visible');
+  }
+}
+
+function getTotal() {
+  return Object.entries(cart).reduce((sum, [id, qty]) => {
+    const p = PRODUCTS.find(x => x.id == id);
+    return sum + (p ? p.price * qty : 0);
+  }, 0);
+}
+
+function getCount() {
+  return Object.values(cart).reduce((s, q) => s + q, 0);
+}
+
+function renderCart() {
+  const items = Object.entries(cart).map(([id, qty]) => {
+    const p = PRODUCTS.find(x => x.id == id);
+    if (!p) return '';
+    return `<div class="cart-item">
+      <div class="cart-item-icon">${p.icon}</div>
+      <div class="cart-item-info">
+        <div class="cart-item-name">${p.name} × ${qty}</div>
+        <div class="cart-item-price">${(p.price * qty).toLocaleString('uk-UA')} ₴</div>
+      </div>
+      <button class="cart-item-remove" onclick="changeQty(${p.id},-99)">✕</button>
+    </div>`;
+  }).join('');
+
+  const cartEl = document.getElementById('cart-items');
+  const footer = document.getElementById('cart-footer');
+  if (!items) {
+    cartEl.innerHTML = '<div class="cart-empty">Кошик порожній 😕</div>';
+    footer.style.display = 'none';
+  } else {
+    cartEl.innerHTML = items;
+    footer.style.display = 'block';
+    document.getElementById('cart-total-price').textContent = getTotal().toLocaleString('uk-UA') + ' ₴';
+  }
+}
+
+function openCart() {
+  renderCart();
+  document.getElementById('cart-overlay').classList.add('open');
+  document.getElementById('cart-drawer').classList.add('open');
+}
+function closeCart() {
+  document.getElementById('cart-overlay').classList.remove('open');
+  document.getElementById('cart-drawer').classList.remove('open');
+}
+
+async function submitOrder() {
+  const btn = document.getElementById('order-btn');
+  btn.disabled = true;
+  btn.textContent = 'Надсилаємо...';
+
+  // Збираємо дані замовлення
+  const items = Object.entries(cart).map(([id, qty]) => {
+    const p = PRODUCTS.find(x => x.id == id);
+    return { id: p.id, name: p.name, qty, price: p.price };
+  });
+
+  // Дані юзера з Telegram
+  const user = tg?.initDataUnsafe?.user || { first_name: 'Тестовий', last_name: 'Юзер', username: 'test' };
+
+  const orderData = {
+    user: {
+      id: user.id,
+      name: `${user.first_name || ''} ${user.last_name || ''}`.trim(),
+      username: user.username || '—'
+    },
+    items,
+    total: getTotal(),
+    timestamp: new Date().toISOString()
+  };
+
+  try {
+    // ⬇️ Заміни URL на свій сервер
+    const res = await fetch('https://YOUR_SERVER/order', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(orderData)
+    });
+    if (!res.ok) throw new Error('Server error');
+  } catch (e) {
+    // У тестовому режимі — просто показуємо success
+    console.log('Order (demo mode):', orderData);
+  }
+
+  closeCart();
+  document.getElementById('success-screen').classList.add('visible');
+  cart = {};
+  updateUI();
+  btn.disabled = false;
+  btn.textContent = 'Оформити замовлення';
+}
+
+function resetShop() {
+  document.getElementById('success-screen').classList.remove('visible');
+}
+
+// Init
+renderProducts();
+</script>
+</body>
+</html>
