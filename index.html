@@ -374,6 +374,99 @@
     cursor: pointer;
   }
 
+  /* Contact modal */
+  .contact-modal-wrap {
+    display: none;
+    position: fixed;
+    inset: 0;
+    background: rgba(0,0,0,0.7);
+    z-index: 40;
+    align-items: flex-end;
+    justify-content: center;
+  }
+  .contact-modal-wrap.open { display: flex; }
+  .contact-modal {
+    background: var(--surface);
+    border: 1px solid var(--border);
+    border-radius: 20px 20px 0 0;
+    padding: 24px 20px 36px;
+    width: 100%;
+    max-width: 480px;
+    animation: slideUp 0.28s cubic-bezier(0.4,0,0.2,1);
+  }
+  @keyframes slideUp { from { transform: translateY(60px); opacity:0; } to { transform: translateY(0); opacity:1; } }
+  .contact-modal-handle {
+    width: 36px; height: 4px;
+    background: var(--border);
+    border-radius: 2px;
+    margin: 0 auto 20px;
+  }
+  .contact-modal-icon { font-size: 40px; text-align: center; margin-bottom: 10px; }
+  .contact-modal-title {
+    font-size: 18px; font-weight: 700;
+    text-align: center; margin-bottom: 6px;
+  }
+  .contact-modal-sub {
+    font-size: 13px; color: var(--muted);
+    text-align: center; line-height: 1.5;
+    margin-bottom: 22px;
+  }
+  .contact-field { margin-bottom: 14px; }
+  .contact-field label {
+    display: block;
+    font-size: 12px; font-weight: 600;
+    color: var(--muted);
+    letter-spacing: 0.06em;
+    text-transform: uppercase;
+    margin-bottom: 6px;
+  }
+  .contact-field input {
+    width: 100%;
+    background: var(--card);
+    border: 1px solid var(--border);
+    border-radius: 12px;
+    padding: 13px 14px;
+    color: var(--text);
+    font-size: 15px;
+    outline: none;
+    transition: border-color 0.15s;
+    font-family: inherit;
+  }
+  .contact-field input:focus { border-color: var(--accent); }
+  .contact-field input.error { border-color: var(--red); }
+  .contact-field input::placeholder { color: var(--muted); }
+  .contact-error {
+    font-size: 12px; color: var(--red);
+    margin-top: 5px; display: none;
+  }
+  .contact-error.show { display: block; }
+  .contact-confirm-btn {
+    width: 100%;
+    background: var(--accent);
+    color: #fff;
+    border: none;
+    border-radius: 14px;
+    padding: 15px;
+    font-size: 16px;
+    font-weight: 700;
+    cursor: pointer;
+    margin-top: 6px;
+    transition: opacity 0.15s;
+  }
+  .contact-confirm-btn:active { opacity: 0.85; }
+  .contact-skip {
+    display: block;
+    text-align: center;
+    margin-top: 12px;
+    font-size: 13px;
+    color: var(--muted);
+    cursor: pointer;
+    text-decoration: underline;
+    text-decoration-color: transparent;
+    transition: color 0.15s;
+  }
+  .contact-skip:hover { color: var(--text); }
+
   @media (max-width: 380px) {
     .products { grid-template-columns: 1fr 1fr; gap: 8px; }
     .product-name { font-size: 12px; }
@@ -434,7 +527,31 @@
   </div>
 </div>
 
-<!-- Success screen -->
+<!-- Contact modal -->
+<div class="contact-modal-wrap" id="contact-modal-wrap">
+  <div class="contact-modal">
+    <div class="contact-modal-handle"></div>
+    <div class="contact-modal-icon">🔒</div>
+    <div class="contact-modal-title">Вкажи контактні дані</div>
+    <div class="contact-modal-sub">Твій профіль Telegram закритий, тому ми не можемо зв'язатись з тобою автоматично. Залиш номер телефону і ми напишемо тобі для підтвердження замовлення.</div>
+
+    <div class="contact-field">
+      <label>Твоє ім'я</label>
+      <input type="text" id="contact-name" placeholder="Олексій" autocomplete="name">
+      <div class="contact-error" id="err-name">Введи своє ім'я</div>
+    </div>
+    <div class="contact-field">
+      <label>Номер телефону</label>
+      <input type="tel" id="contact-phone" placeholder="+380 XX XXX XX XX" autocomplete="tel">
+      <div class="contact-error" id="err-phone">Введи коректний номер (+380...)</div>
+    </div>
+
+    <button class="contact-confirm-btn" onclick="confirmContact()">Підтвердити і оформити</button>
+    <span class="contact-skip" onclick="skipContact()">Пропустити (замовлення без контактів)</span>
+  </div>
+</div>
+
+
 <div class="success-screen" id="success-screen">
   <div class="success-icon">✅</div>
   <div class="success-title">Замовлення прийнято!</div>
@@ -588,33 +705,98 @@ function closeCart() {
   document.getElementById('cart-drawer').classList.remove('open');
 }
 
+// --- Перевірка даних юзера ---
+function getTelegramUser() {
+  const u = tg?.initDataUnsafe?.user;
+  if (!u) return null;
+  const name = `${u.first_name || ''} ${u.last_name || ''}`.trim();
+  const username = u.username || '';
+  // Вважаємо дані "достатніми" якщо є хоч ім'я або username
+  if (!name && !username) return null;
+  return { id: u.id || null, name: name || username, username: username || '—', phone: null };
+}
+
+let pendingOrderUser = null; // зберігаємо поки юзер заповнює форму
+
 async function submitOrder() {
   const btn = document.getElementById('order-btn');
   btn.disabled = true;
-  btn.textContent = 'Надсилаємо...';
+  btn.textContent = 'Перевіряємо...';
+  closeCart();
 
-  // Збираємо дані замовлення
+  const tgUser = getTelegramUser();
+
+  if (tgUser) {
+    // Дані є — одразу відправляємо
+    await sendOrder(tgUser);
+  } else {
+    // Даних немає — показуємо форму
+    pendingOrderUser = null;
+    document.getElementById('contact-name').value = '';
+    document.getElementById('contact-phone').value = '';
+    document.getElementById('err-name').classList.remove('show');
+    document.getElementById('err-phone').classList.remove('show');
+    document.getElementById('contact-name').classList.remove('error');
+    document.getElementById('contact-phone').classList.remove('error');
+    document.getElementById('contact-modal-wrap').classList.add('open');
+  }
+
+  btn.disabled = false;
+  btn.textContent = 'Оформити замовлення';
+}
+
+function confirmContact() {
+  const nameEl = document.getElementById('contact-name');
+  const phoneEl = document.getElementById('contact-phone');
+  const name = nameEl.value.trim();
+  const phone = phoneEl.value.trim();
+
+  let valid = true;
+
+  if (name.length < 2) {
+    nameEl.classList.add('error');
+    document.getElementById('err-name').classList.add('show');
+    valid = false;
+  } else {
+    nameEl.classList.remove('error');
+    document.getElementById('err-name').classList.remove('show');
+  }
+
+  const phoneOk = /^\+?[\d\s\-()]{10,15}$/.test(phone);
+  if (!phoneOk) {
+    phoneEl.classList.add('error');
+    document.getElementById('err-phone').classList.add('show');
+    valid = false;
+  } else {
+    phoneEl.classList.remove('error');
+    document.getElementById('err-phone').classList.remove('show');
+  }
+
+  if (!valid) return;
+
+  document.getElementById('contact-modal-wrap').classList.remove('open');
+  sendOrder({ id: null, name, username: '—', phone });
+}
+
+function skipContact() {
+  document.getElementById('contact-modal-wrap').classList.remove('open');
+  sendOrder({ id: null, name: 'Анонім', username: '—', phone: null });
+}
+
+async function sendOrder(user) {
   const items = Object.entries(cart).map(([id, qty]) => {
     const p = PRODUCTS.find(x => x.id == id);
     return { id: p.id, name: p.name, qty, price: p.price };
   });
 
-  // Дані юзера з Telegram
-  const user = tg?.initDataUnsafe?.user || { first_name: 'Тестовий', last_name: 'Юзер', username: 'test' };
-
   const orderData = {
-    user: {
-      id: user.id,
-      name: `${user.first_name || ''} ${user.last_name || ''}`.trim(),
-      username: user.username || '—'
-    },
+    user,
     items,
     total: getTotal(),
     timestamp: new Date().toISOString()
   };
 
   try {
-    // ⬇️ Заміни URL на свій сервер
     const res = await fetch('https://YOUR_SERVER/order', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
@@ -622,16 +804,12 @@ async function submitOrder() {
     });
     if (!res.ok) throw new Error('Server error');
   } catch (e) {
-    // У тестовому режимі — просто показуємо success
     console.log('Order (demo mode):', orderData);
   }
 
-  closeCart();
   document.getElementById('success-screen').classList.add('visible');
   cart = {};
   updateUI();
-  btn.disabled = false;
-  btn.textContent = 'Оформити замовлення';
 }
 
 function resetShop() {
