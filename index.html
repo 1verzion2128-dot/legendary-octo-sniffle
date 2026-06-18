@@ -797,7 +797,7 @@ async function sendOrder(user) {
   };
 
   try {
-    const res = await fetch('https://YOUR_SERVER/order', {
+    const res = await fetch('https://web-production-125ac.up.railway.app/order', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify(orderData)
